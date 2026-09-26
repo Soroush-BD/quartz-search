@@ -22,6 +22,9 @@ let currentSearchTerm: string = "";
 const numSearchResults = 8;
 const numTagResults = 5;
 const contextWindowWords = 30;
+// Words of an excerpt shown ahead of its first match, so that even a line or
+// two of it reaches the match.
+const contextWordsBefore = 5;
 
 const encoder = (str: string): string[] => {
   const tokens: string[] = [];
@@ -689,9 +692,10 @@ function highlight(searchTerm: string, text: string, trim?: boolean): string {
   let tokenizedText = escapeHTML(text)
     .split(/\s+/)
     .filter((t) => t !== "");
+  const wordCount = tokenizedText.length;
 
   let startIndex = 0;
-  let endIndex = tokenizedText.length - 1;
+  let endIndex = wordCount;
 
   if (trim) {
     const includesCheck = (tok: string) => {
@@ -710,8 +714,11 @@ function highlight(searchTerm: string, text: string, trim?: boolean): string {
       }
     }
 
-    startIndex = Math.max(bestIndex - contextWindowWords, 0);
-    endIndex = Math.min(startIndex + 2 * contextWindowWords, tokenizedText.length - 1);
+    // Start just ahead of the first match in the best window. With no match
+    // in the text at all, the excerpt is its opening.
+    const firstMatch = occurrencesIndices.indexOf(true, bestIndex);
+    startIndex = firstMatch === -1 ? 0 : Math.max(firstMatch - contextWordsBefore, 0);
+    endIndex = Math.min(startIndex + 2 * contextWindowWords, wordCount);
     tokenizedText = tokenizedText.slice(startIndex, endIndex);
   }
 
@@ -729,9 +736,7 @@ function highlight(searchTerm: string, text: string, trim?: boolean): string {
     })
     .join(" ");
 
-  return (
-    (startIndex === 0 ? "" : "...") + slice + (endIndex === tokenizedText.length - 1 ? "" : "...")
-  );
+  return (startIndex === 0 ? "" : "...") + slice + (endIndex === wordCount ? "" : "...");
 }
 
 function highlightTags(searchTags: string[], tags?: string[]): string[] {
