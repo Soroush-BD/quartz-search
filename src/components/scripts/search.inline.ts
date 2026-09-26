@@ -383,12 +383,13 @@ async function setupSearch() {
         if (highlights.length === 0) return;
         highlights.sort((a, b) => b.innerHTML.length - a.innerHTML.length);
         const target = highlights[0] as HTMLElement;
-        let offset = 0;
-        let current: HTMLElement | null = target;
-        while (current && current !== preview) {
-          offset += current.offsetTop;
-          current = current.offsetParent as HTMLElement | null;
-        }
+        // Measured against the preview itself: offsetTop counts from the
+        // nearest positioned ancestor, which the preview is not, so it
+        // overshot by the preview's own distance from the top.
+        const offset =
+          target.getBoundingClientRect().top -
+          preview!.getBoundingClientRect().top +
+          preview!.scrollTop;
         preview!.scrollTop = Math.max(0, offset - 50);
       });
     };
