@@ -5,6 +5,7 @@ import {
   registerEscapeHandler,
   resolveBasePath,
   escapeHTML,
+  unescapeHTML,
 } from "@quartz-community/utils";
 
 interface Item {
@@ -689,7 +690,9 @@ function highlightHTML(searchTerm: string, el: HTMLElement): string {
 
 function highlight(searchTerm: string, text: string, trim?: boolean): string {
   const tokenizedTerms = tokenizeTerm(searchTerm);
-  let tokenizedText = escapeHTML(text)
+  // The description transformer already escapes the text it indexes, so it
+  // is unescaped first: escaping it again would show "&lt;" for "<".
+  let tokenizedText = escapeHTML(unescapeHTML(text))
     .split(/\s+/)
     .filter((t) => t !== "");
   const wordCount = tokenizedText.length;
