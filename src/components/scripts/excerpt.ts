@@ -2,7 +2,7 @@ import { escapeHTML } from "@quartz-community/utils";
 
 /** How many of a page's matching lines a result shows. */
 const excerptLineLimit = 3;
-/** Characters of a long line kept either side of its first match. */
+/** Characters of a long line kept before its first match and after its last. */
 const excerptContext = 50;
 
 /** The search term's words, then each run of them from the first, longest first. */
@@ -46,9 +46,9 @@ export function highlight(searchTerm: string, text: string): string {
 }
 
 /**
- * A long line cut to its match at `start`-`end`, with `excerptContext`
- * characters either side ending at word boundaries, and ellipses where text
- * is left out.
+ * A long line cut to its matches, which run from `start` to `end`, with
+ * `excerptContext` characters either side ending at word boundaries, and
+ * ellipses where text is left out.
  */
 function shortenLine(line: string, start: number, end: number): string {
   let from = Math.max(0, start - excerptContext);
@@ -70,8 +70,6 @@ function shortenLine(line: string, start: number, end: number): string {
 function highlightLine(line: string, pattern: RegExp): string {
   let html = "";
   let last = 0;
-  // matchAll starts from the pattern's lastIndex, which finding the line moved.
-  pattern.lastIndex = 0;
   for (const match of line.matchAll(pattern)) {
     const index = match.index ?? 0;
     html += escapeHTML(line.slice(last, index));
@@ -84,7 +82,7 @@ function highlightLine(line: string, pattern: RegExp): string {
 /**
  * The lines of `text` that match `searchTerm`, as Obsidian's own search lists
  * a note's matches: the first few, in order, each escaped with every match
- * highlighted, and a long one shortened around its first match. A page that
+ * highlighted, and a long one shortened around its matches. A page that
  * matched only by its title has none.
  */
 export function matchingLines(searchTerm: string, text: string): string[] {
@@ -93,12 +91,14 @@ export function matchingLines(searchTerm: string, text: string): string[] {
 
   const excerpts: string[] = [];
   for (const line of text.split("\n")) {
-    pattern.lastIndex = 0;
-    const match = pattern.exec(line);
-    if (!match) continue;
+    const matches = [...line.matchAll(pattern)];
+    const first = matches[0];
+    const last = matches[matches.length - 1];
+    if (!first || !last) continue;
 
-    const end = match.index + match[0].length;
-    excerpts.push(highlightLine(shortenLine(line, match.index, end), pattern));
+    const start = first.index ?? 0;
+    const end = (last.index ?? 0) + last[0].length;
+    excerpts.push(highlightLine(shortenLine(line, start, end), pattern));
     if (excerpts.length === excerptLineLimit) break;
   }
   return excerpts;

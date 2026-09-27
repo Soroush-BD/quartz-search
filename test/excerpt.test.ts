@@ -78,6 +78,13 @@ describe("matchingLines", () => {
     expect(text.length).toBeLessThanOrEqual(3 + 50 + "cache".length + 50 + 3);
   });
 
+  it("keeps the context after the line's last match, not only its first", () => {
+    const line = "        const cached = await this.cacheManager.get<User>(`user:${id}`);";
+    expect(matchingLines("cache", line)).toEqual([
+      `        const ${mark("cache")}d = await this.${mark("cache")}Manager.get&lt;User&gt;(\`user:\${id}\`);`,
+    ]);
+  });
+
   it("escapes each line once, and never matches inside an escape", () => {
     expect(matchingLines("user", "cacheManager.get<User>(id)")).toEqual([
       `cacheManager.get&lt;${mark("User")}&gt;(id)`,
