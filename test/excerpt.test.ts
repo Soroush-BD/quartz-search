@@ -78,6 +78,13 @@ describe("matchingLines", () => {
     expect(text.length).toBeLessThanOrEqual(3 + 50 + "cache".length + 50 + 3);
   });
 
+  it("treats punctuation as a word's edge when cutting", () => {
+    const line = `import { getCachedResponse } from "@blackdynamix/bd-next-utilities/server";`;
+    expect(matchingLines("cache", line)).toEqual([
+      `import { get${mark("Cache")}dResponse } from &quot;@blackdynamix/bd-next-utilities...`,
+    ]);
+  });
+
   it("keeps the context after the line's last match, not only its first", () => {
     const line = "        const cached = await this.cacheManager.get<User>(`user:${id}`);";
     expect(matchingLines("cache", line)).toEqual([

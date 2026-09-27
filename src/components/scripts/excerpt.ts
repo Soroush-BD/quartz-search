@@ -45,22 +45,29 @@ export function highlight(searchTerm: string, text: string): string {
     .join(" ");
 }
 
+/** A letter, digit or underscore, in any script. */
+const wordCharacter = /[\p{L}\p{N}_]/u;
+
+/** Whether `index` falls inside a word of `line`, rather than at its edge. */
+function isInsideWord(line: string, index: number): boolean {
+  return wordCharacter.test(line[index - 1] ?? "") && wordCharacter.test(line[index] ?? "");
+}
+
 /**
  * A long line cut to its matches, which run from `start` to `end`, with
- * `excerptContext` characters either side ending at word boundaries, and
- * ellipses where text is left out.
+ * about `excerptContext` characters either side, and ellipses where text is
+ * left out. Each cut moves to the nearest edge of a word inside that context,
+ * so no word is split; punctuation counts as an edge, as in a path. The text
+ * before the closing ellipsis ends on a word, not on a space or punctuation.
  */
 function shortenLine(line: string, start: number, end: number): string {
   let from = Math.max(0, start - excerptContext);
   let to = Math.min(line.length, end + excerptContext);
 
-  if (from > 0) {
-    const space = line.indexOf(" ", from);
-    if (space !== -1 && space < start) from = space;
-  }
+  while (from < start && isInsideWord(line, from)) from++;
+  while (to > end && isInsideWord(line, to)) to--;
   if (to < line.length) {
-    const space = line.lastIndexOf(" ", to);
-    if (space > end) to = space;
+    while (to > end && !wordCharacter.test(line[to - 1] ?? "")) to--;
   }
 
   return (from > 0 ? "..." : "") + line.slice(from, to) + (to < line.length ? "..." : "");
