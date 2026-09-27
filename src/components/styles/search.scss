@@ -184,7 +184,10 @@
   background-color: transparent;
 }
 
+// The results fill the row, or share it with the preview when it is on.
+// Otherwise the list shrinks to its longest line.
 .search > .search-container > .search-space > .search-layout > .results-container {
+  flex: 1 1 auto;
   overflow-y: auto;
 }
 
