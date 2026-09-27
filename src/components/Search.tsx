@@ -57,7 +57,9 @@ export default ((userOpts?: Partial<SearchOptions>) => {
             />
             <div
               class="search-layout"
-              data-preview={opts.enablePreview}
+              // Present only when the preview is on: the styles match the
+              // attribute's presence, so "false" would still apply them.
+              data-preview={opts.enablePreview ? "true" : undefined}
               data-field-priority={JSON.stringify(opts.fieldPriority)}
             ></div>
           </div>
