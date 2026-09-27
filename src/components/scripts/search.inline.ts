@@ -7,6 +7,7 @@ import {
   escapeHTML,
   unescapeHTML,
 } from "@quartz-community/utils";
+import { highlight, tokenizeTerm } from "./excerpt";
 
 interface Item {
   id: number;
@@ -22,10 +23,6 @@ let searchType: SearchType = "basic";
 let currentSearchTerm: string = "";
 const numSearchResults = 8;
 const numTagResults = 5;
-const contextWindowWords = 30;
-// Words of an excerpt shown ahead of its first match, so that even a line or
-// two of it reaches the match.
-const contextWordsBefore = 5;
 
 const encoder = (str: string): string[] => {
   const tokens: string[] = [];
@@ -636,17 +633,6 @@ async function setupSearch() {
   }
 }
 
-function tokenizeTerm(term: string): string[] {
-  const tokens = term.split(/\s+/).filter((t) => t.trim() !== "");
-  const tokenLen = tokens.length;
-  if (tokenLen > 1) {
-    for (let i = 1; i < tokenLen; i++) {
-      tokens.push(tokens.slice(0, i + 1).join(" "));
-    }
-  }
-  return tokens.sort((a, b) => b.length - a.length);
-}
-
 function highlightHTML(searchTerm: string, el: HTMLElement): string {
   const tokenizedTerms = tokenizeTerm(searchTerm).filter((term) => term.trim() !== "");
   if (tokenizedTerms.length === 0) return el.innerHTML;
@@ -687,60 +673,6 @@ function highlightHTML(searchTerm: string, el: HTMLElement): string {
     textNode.parentNode?.replaceChild(fragment, textNode);
   }
   return html.body.innerHTML;
-}
-
-function highlight(searchTerm: string, text: string, trim?: boolean): string {
-  const tokenizedTerms = tokenizeTerm(searchTerm);
-  // The description transformer already escapes the text it indexes, so it
-  // is unescaped first: escaping it again would show "&lt;" for "<".
-  let tokenizedText = escapeHTML(unescapeHTML(text))
-    .split(/\s+/)
-    .filter((t) => t !== "");
-  const wordCount = tokenizedText.length;
-
-  let startIndex = 0;
-  let endIndex = wordCount;
-
-  if (trim) {
-    const includesCheck = (tok: string) => {
-      return tokenizedTerms.some((term) => tok.toLowerCase().startsWith(term.toLowerCase()));
-    };
-    const occurrencesIndices = tokenizedText.map(includesCheck);
-
-    let bestSum = 0;
-    let bestIndex = 0;
-    for (let i = 0; i < Math.max(tokenizedText.length - contextWindowWords, 0); i++) {
-      const window = occurrencesIndices.slice(i, i + contextWindowWords);
-      const windowSum = window.reduce((total, cur) => total + (cur ? 1 : 0), 0);
-      if (windowSum >= bestSum) {
-        bestSum = windowSum;
-        bestIndex = i;
-      }
-    }
-
-    // Start just ahead of the first match in the best window. With no match
-    // in the text at all, the excerpt is its opening.
-    const firstMatch = occurrencesIndices.indexOf(true, bestIndex);
-    startIndex = firstMatch === -1 ? 0 : Math.max(firstMatch - contextWordsBefore, 0);
-    endIndex = Math.min(startIndex + 2 * contextWindowWords, wordCount);
-    tokenizedText = tokenizedText.slice(startIndex, endIndex);
-  }
-
-  const slice = tokenizedText
-    .map((tok) => {
-      let result = tok;
-      for (const searchTok of tokenizedTerms) {
-        if (tok.toLowerCase().includes(searchTok.toLowerCase())) {
-          const regex = new RegExp(searchTok.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi");
-          result = tok.replace(regex, (match) => `<span class="highlight">${match}</span>`);
-          break;
-        }
-      }
-      return result;
-    })
-    .join(" ");
-
-  return (startIndex === 0 ? "" : "...") + slice + (endIndex === wordCount ? "" : "...");
 }
 
 function highlightTags(searchTags: string[], tags?: string[]): string[] {
@@ -786,7 +718,10 @@ function formatForDisplay(term: string, id: number): any {
       parsed.tags.length > 0 && !parsed.query
         ? escapeHTML(data.title)
         : highlight(term, data.title || ""),
-    content: highlight(term, data.content || "", true),
+    // The description transformer escapes the text it indexes, and the
+    // excerpt escapes what it shows, so the content is unescaped first:
+    // escaping it twice would show "&lt;" for "<".
+    content: highlight(term, unescapeHTML(data.content || ""), true),
     tags: highlightTags(parsed.tags, data.tags),
   };
 }
