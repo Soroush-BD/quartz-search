@@ -7,7 +7,7 @@ import {
   escapeHTML,
   unescapeHTML,
 } from "@quartz-community/utils";
-import { highlight, tokenizeTerm } from "./excerpt";
+import { highlight, matchingLines, tokenizeTerm } from "./excerpt";
 
 interface Item {
   id: number;
@@ -718,10 +718,12 @@ function formatForDisplay(term: string, id: number): any {
       parsed.tags.length > 0 && !parsed.query
         ? escapeHTML(data.title)
         : highlight(term, data.title || ""),
-    // The description transformer escapes the text it indexes, and the
-    // excerpt escapes what it shows, so the content is unescaped first:
-    // escaping it twice would show "&lt;" for "<".
-    content: highlight(term, unescapeHTML(data.content || ""), true),
+    // One excerpt per matching line. The description transformer escapes the
+    // text it indexes, and the excerpts escape what they show, so the content
+    // is unescaped first: escaping it twice would show "&lt;" for "<".
+    content: matchingLines(term, unescapeHTML(data.content || ""))
+      .map((line) => `<span class="excerpt-line">${line}</span>`)
+      .join(""),
     tags: highlightTags(parsed.tags, data.tags),
   };
 }

@@ -1,8 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { highlight, tokenizeTerm } from "../src/components/scripts/excerpt";
+import { highlight, matchingLines, tokenizeTerm } from "../src/components/scripts/excerpt";
 
-const words = (count: number, word = "word") =>
-  Array.from({ length: count }, (_, index) => `${word}${index}`);
+const mark = (text: string) => `<span class="highlight">${text}</span>`;
 
 describe("tokenizeTerm", () => {
   it("returns each word and each run of words from the first, longest first", () => {
@@ -21,48 +20,73 @@ describe("tokenizeTerm", () => {
 });
 
 describe("highlight", () => {
-  it("marks every match in the full text when not trimming", () => {
+  it("marks every match", () => {
     expect(highlight("cache", "Use a cache, then cached values")).toBe(
-      'Use a <span class="highlight">cache</span>, then <span class="highlight">cache</span>d values',
+      `Use a ${mark("cache")}, then ${mark("cache")}d values`,
     );
   });
 
   it("escapes the text once", () => {
     expect(highlight("list", "new CachedList<string>(60)")).toBe(
-      'new Cached<span class="highlight">List</span>&lt;string&gt;(60)',
+      `new Cached${mark("List")}&lt;string&gt;(60)`,
     );
   });
+});
 
-  it("keeps a text shorter than the window whole, without ellipses", () => {
-    const text = "a short note about the cache layer";
-    const excerpt = highlight("cache", text, true);
-    expect(excerpt.startsWith("...")).toBe(false);
-    expect(excerpt.endsWith("...")).toBe(false);
-    expect(excerpt).toContain('<span class="highlight">cache</span>');
+describe("matchingLines", () => {
+  it("returns the first three matching lines, in order", () => {
+    const text = [
+      "no match",
+      "first cache",
+      "second cache",
+      "nothing",
+      "third cache",
+      "fourth cache",
+    ].join("\n");
+    expect(matchingLines("cache", text)).toEqual([
+      `first ${mark("cache")}`,
+      `second ${mark("cache")}`,
+      `third ${mark("cache")}`,
+    ]);
   });
 
-  it("starts a few words before a match far into the text", () => {
-    const text = [...words(200), "cache", ...words(200, "tail")].join(" ");
-    const excerpt = highlight("cache", text, true);
-    expect(
-      excerpt.startsWith(
-        '...word195 word196 word197 word198 word199 <span class="highlight">cache</span> ',
-      ),
-    ).toBe(true);
+  it("keeps a short line whole, indentation included", () => {
+    expect(matchingLines("cache", "        if (cached) {")).toEqual([
+      `        if (${mark("cache")}d) {`,
+    ]);
+  });
+
+  it("matches inside words and ignores case", () => {
+    expect(matchingLines("cache", "@Inject(CACHE_MANAGER) private cacheManager: Cache,")).toEqual([
+      `@Inject(${mark("CACHE")}_MANAGER) private ${mark("cache")}Manager: ${mark("Cache")},`,
+    ]);
+  });
+
+  it("shortens a long line around its first match, at word boundaries", () => {
+    const before = Array.from({ length: 20 }, (_, index) => `word${index}`).join(" ");
+    const after = Array.from({ length: 20 }, (_, index) => `tail${index}`).join(" ");
+    const excerpt = matchingLines("cache", `${before} the cache layer ${after}`)[0] ?? "";
+
+    expect(excerpt.startsWith("... ")).toBe(true);
     expect(excerpt.endsWith("...")).toBe(true);
+    expect(excerpt).toContain(`the ${mark("cache")} layer`);
+    // Whole words only on either side, and at most 50 characters of each.
+    const text = excerpt.replace(/<[^>]+>/g, "");
+    const words = text.slice("... ".length, -"...".length).split(" ");
+    expect(before.split(" ")).toContain(words[0]);
+    expect(after.split(" ")).toContain(words[words.length - 1]);
+    expect(text.length).toBeLessThanOrEqual(3 + 50 + "cache".length + 50 + 3);
   });
 
-  it("ends without an ellipsis when the excerpt reaches the end of the text", () => {
-    const text = [...words(200), "cache"].join(" ");
-    const excerpt = highlight("cache", text, true);
-    expect(excerpt.startsWith("...")).toBe(true);
-    expect(excerpt.endsWith('<span class="highlight">cache</span>')).toBe(true);
+  it("escapes each line once, and never matches inside an escape", () => {
+    expect(matchingLines("user", "cacheManager.get<User>(id)")).toEqual([
+      `cacheManager.get&lt;${mark("User")}&gt;(id)`,
+    ]);
+    expect(matchingLines("lt", "a < b")).toEqual([]);
   });
 
-  it("shows the text's opening when nothing in it matches", () => {
-    const excerpt = highlight("cache", words(200).join(" "), true);
-    expect(excerpt.startsWith("word0 ")).toBe(true);
-    expect(excerpt.endsWith("...")).toBe(true);
-    expect(excerpt).not.toContain("highlight");
+  it("returns nothing when no line matches", () => {
+    expect(matchingLines("cache", "a title-only match\nwith no body text")).toEqual([]);
+    expect(matchingLines("   ", "cache")).toEqual([]);
   });
 });
