@@ -70,12 +70,12 @@ describe("matchingLines", () => {
     expect(excerpt.startsWith("... ")).toBe(true);
     expect(excerpt.endsWith("...")).toBe(true);
     expect(excerpt).toContain(`the ${mark("cache")} layer`);
-    // Whole words only on either side, and at most 50 characters of each.
+    // Whole words only on either side, and at most 49 and 50 characters of them.
     const text = excerpt.replace(/<[^>]+>/g, "");
     const words = text.slice("... ".length, -"...".length).split(" ");
     expect(before.split(" ")).toContain(words[0]);
     expect(after.split(" ")).toContain(words[words.length - 1]);
-    expect(text.length).toBeLessThanOrEqual(3 + 50 + "cache".length + 50 + 3);
+    expect(text.length).toBeLessThanOrEqual(3 + 49 + "cache".length + 50 + 3);
   });
 
   it("treats punctuation as a word's edge when cutting", () => {
