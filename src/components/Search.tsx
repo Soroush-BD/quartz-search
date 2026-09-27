@@ -14,6 +14,10 @@ export type SearchField = "title" | "content" | "tags";
 export interface SearchOptions {
   enablePreview: boolean;
   fieldPriority: SearchField[];
+  /** The search field's placeholder. Defaults to the locale's wording. */
+  placeholder?: string;
+  /** The search button's text and label. Defaults to the locale's wording. */
+  title?: string;
 }
 
 const defaultOptions: SearchOptions = {
@@ -25,15 +29,13 @@ export default ((userOpts?: Partial<SearchOptions>) => {
   const Search: QuartzComponent = ({ displayClass, cfg }: QuartzComponentProps) => {
     const opts = { ...defaultOptions, ...userOpts };
     const locale = cfg.locale ?? "en-US";
-    const searchPlaceholder = i18n(locale).components.search.searchBarPlaceholder;
+    const searchPlaceholder =
+      opts.placeholder ?? i18n(locale).components.search.searchBarPlaceholder;
+    const searchTitle = opts.title ?? i18n(locale).components.search.title;
 
     return (
       <div class={classNames(displayClass, "search")}>
-        <button
-          class="search-button"
-          aria-label={i18n(locale).components.search.title}
-          aria-expanded="false"
-        >
+        <button class="search-button" aria-label={searchTitle} aria-expanded="false">
           <svg role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 19.9 19.7">
             <title>Search</title>
             <g class="search-path" fill="none">
@@ -41,7 +43,7 @@ export default ((userOpts?: Partial<SearchOptions>) => {
               <circle cx="8" cy="8" r="7" />
             </g>
           </svg>
-          <p>{i18n(locale).components.search.title}</p>
+          <p>{searchTitle}</p>
         </button>
         <div class="search-container">
           <div class="search-space">
