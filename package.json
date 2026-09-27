@@ -104,7 +104,9 @@
         "title",
         "content",
         "tags"
-      ]
+      ],
+      "resultLimit": 8,
+      "showPath": false
     },
     "components": {
       "Search": {
@@ -119,6 +121,15 @@
       },
       "fieldPriority": {
         "type": "array"
+      },
+      "resultLimit": {
+        "type": "number"
+      },
+      "showPath": {
+        "type": "boolean"
+      },
+      "pathRoot": {
+        "type": "string"
       }
     }
   },

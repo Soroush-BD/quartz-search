@@ -8,6 +8,7 @@ import {
   unescapeHTML,
 } from "@quartz-community/utils";
 import { highlight, matchingLines, tokenizeTerm } from "./excerpt";
+import { matchHeadings, resultPath, type Heading } from "./results";
 
 interface Item {
   id: number;
@@ -15,6 +16,7 @@ interface Item {
   title: string;
   content: string;
   tags: string[];
+  headings?: Heading[];
   [key: string]: any;
 }
 
@@ -157,6 +159,10 @@ async function setupSearch() {
     const fieldPriority: string[] = fieldPriorityAttr
       ? JSON.parse(fieldPriorityAttr)
       : ["title", "content", "tags"];
+    const resultLimit = Number(searchLayout.getAttribute("data-result-limit")) || numSearchResults;
+    // Present only when paths are on, and empty when they start at the
+    // content folder itself.
+    const pathRoot = searchLayout.getAttribute("data-path-root");
 
     let results = searchLayout.querySelector(".results-container") as HTMLDivElement | null;
     if (!results) {
@@ -321,8 +327,16 @@ async function setupSearch() {
         for (const item of finalResults) {
           const itemTile = document.createElement("a");
           itemTile.className = "result-card";
-          itemTile.id = item.slug;
-          itemTile.href = resolveBasePath(item.slug);
+          // The page a result is on, which a heading's result shares with the
+          // page's own, so only the page's takes it as its id too.
+          itemTile.dataset.slug = item.slug;
+          if (item.heading) {
+            itemTile.classList.add("heading-result");
+            itemTile.href = `${resolveBasePath(item.slug)}#${item.heading}`;
+          } else {
+            itemTile.id = item.slug;
+            itemTile.href = resolveBasePath(item.slug);
+          }
 
           const titleEl = document.createElement("h3");
           titleEl.className = "card-title";
@@ -336,10 +350,27 @@ async function setupSearch() {
             itemTile.appendChild(tagList);
           }
 
-          const descEl = document.createElement("p");
-          descEl.className = "card-description";
-          descEl.innerHTML = item.content.replace(/<(?!\/?span\b)[^>]*>/gi, "");
-          itemTile.appendChild(descEl);
+          if (!item.heading) {
+            const descEl = document.createElement("p");
+            descEl.className = "card-description";
+            descEl.innerHTML = item.content.replace(/<(?!\/?span\b)[^>]*>/gi, "");
+            itemTile.appendChild(descEl);
+          }
+
+          if (item.path) {
+            const pathEl = document.createElement("p");
+            pathEl.className = "card-path";
+            pathEl.textContent = item.path;
+            itemTile.appendChild(pathEl);
+          }
+
+          if (item.heading) {
+            const flairEl = document.createElement("span");
+            flairEl.className = "card-flair";
+            flairEl.setAttribute("aria-label", "Heading");
+            flairEl.textContent = "H";
+            itemTile.appendChild(flairEl);
+          }
 
           results.appendChild(itemTile);
         }
@@ -359,7 +390,7 @@ async function setupSearch() {
       if (!preview) return;
       removeAllChildren(preview);
       if (!el) return;
-      const slug = el.id;
+      const slug = el.dataset.slug ?? el.id;
       const token = ++previewToken;
       const contents = await fetchContent(slug);
       if (token !== previewToken) return;
@@ -455,7 +486,7 @@ async function setupSearch() {
       if (parsed.query) {
         searchResults = await index.searchAsync({
           query: parsed.query,
-          limit: parsed.tags.length > 0 ? 10000 : numSearchResults,
+          limit: parsed.tags.length > 0 ? 10000 : resultLimit,
           index: ["title", "content"],
         });
       } else if (parsed.tags.length > 0) {
@@ -489,9 +520,19 @@ async function setupSearch() {
 
       const displayTerm =
         parsed.query || (parsed.tags.length > 0 ? parsed.tags.join(" ") : inputValue);
-      const finalResults = filteredIds.map((id) => formatForDisplay(displayTerm, id));
+      // Headings first, as Obsidian lists them, when the index has them. A
+      // search by tag is a search for pages, so it lists none.
+      const headingResults =
+        parsed.query && parsed.tags.length === 0 && contentData
+          ? matchHeadings(parsed.query, contentData, resultLimit).map(({ page, heading }) =>
+              formatHeadingForDisplay(displayTerm, page, heading, pathRoot),
+            )
+          : [];
+      const pageResults = filteredIds
+        .slice(0, resultLimit - headingResults.length)
+        .map((id) => formatForDisplay(displayTerm, id, pathRoot));
 
-      await displayResults(finalResults.slice(0, numSearchResults));
+      await displayResults([...headingResults, ...pageResults]);
       const resultElements = getResultElements();
       setFocus(resultElements[0] ?? null);
     };
@@ -553,7 +594,7 @@ async function setupSearch() {
         const focused = currentHover;
         if (focused instanceof HTMLAnchorElement) {
           e.preventDefault();
-          storeSearchTerm();
+          storeSearchTerm(focused);
           hideSearch();
           focused.click();
         }
@@ -576,7 +617,10 @@ async function setupSearch() {
     document.addEventListener("keydown", onDocumentKeydown);
     addCleanup(() => document.removeEventListener("keydown", onDocumentKeydown));
 
-    const storeSearchTerm = () => {
+    // The page opened from a result scrolls to the term's first match, unless
+    // the result is a heading, whose link already says where to go.
+    const storeSearchTerm = (result: HTMLElement) => {
+      if (result.classList.contains("heading-result")) return;
       const parsed = parseSearchQuery(currentSearchTerm);
       const term =
         parsed.query || (parsed.tags.length > 0 ? parsed.tags.join(" ") : currentSearchTerm);
@@ -587,7 +631,7 @@ async function setupSearch() {
       const target = (e.target as HTMLElement).closest(".result-card") as HTMLAnchorElement | null;
       if (!target || target.classList.contains("no-match")) return;
       if (e instanceof MouseEvent && (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey)) return;
-      storeSearchTerm();
+      storeSearchTerm(target);
       hideSearch();
     };
     const onResultsMouseover = (e: Event) => {
@@ -689,7 +733,25 @@ function highlightTags(searchTags: string[], tags?: string[]): string[] {
     .slice(0, numTagResults);
 }
 
-function formatForDisplay(term: string, id: number): any {
+/** A heading's result: its title, the page it is on, and where that page is. */
+function formatHeadingForDisplay(
+  term: string,
+  page: string,
+  heading: Heading,
+  pathRoot: string | null,
+): any {
+  const data = contentData?.[page];
+  return {
+    slug: page,
+    heading: heading.slug,
+    title: highlight(term, heading.text),
+    content: "",
+    tags: [],
+    path: data && pathRoot !== null ? resultPath(data.filePath ?? "", pathRoot, true) : "",
+  };
+}
+
+function formatForDisplay(term: string, id: number, pathRoot: string | null = null): any {
   const slug = idDataMap[id];
   if (!slug || !contentData) {
     return {
@@ -725,6 +787,7 @@ function formatForDisplay(term: string, id: number): any {
       .map((line) => `<span class="excerpt-line">${line}</span>`)
       .join(""),
     tags: highlightTags(parsed.tags, data.tags),
+    path: pathRoot !== null ? resultPath(data.filePath ?? "", pathRoot, false) : "",
   };
 }
 

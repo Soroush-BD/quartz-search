@@ -18,11 +18,22 @@ export interface SearchOptions {
   placeholder?: string;
   /** The search button's text and label. Defaults to the locale's wording. */
   title?: string;
+  /**
+   * How many results to list: matching headings first, when the content
+   * index includes them, then pages.
+   */
+  resultLimit: number;
+  /** Whether to note where each result is, under it. */
+  showPath: boolean;
+  /** The folder those paths start from, standing for the content folder. */
+  pathRoot?: string;
 }
 
 const defaultOptions: SearchOptions = {
   enablePreview: true,
   fieldPriority: ["title", "content", "tags"],
+  resultLimit: 8,
+  showPath: false,
 };
 
 export default ((userOpts?: Partial<SearchOptions>) => {
@@ -61,6 +72,8 @@ export default ((userOpts?: Partial<SearchOptions>) => {
               // attribute's presence, so "false" would still apply them.
               data-preview={opts.enablePreview ? "true" : undefined}
               data-field-priority={JSON.stringify(opts.fieldPriority)}
+              data-result-limit={opts.resultLimit}
+              data-path-root={opts.showPath ? (opts.pathRoot ?? "") : undefined}
             ></div>
           </div>
         </div>

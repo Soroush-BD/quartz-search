@@ -304,6 +304,25 @@
   color: var(--gray);
 }
 
+// A heading's result marks itself as one beside its title and path.
+.search
+  > .search-container
+  > .search-space
+  > .search-layout
+  > .results-container
+  .result-card.heading-result {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  column-gap: 0.5em;
+  align-items: center;
+
+  & > .card-flair {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    color: var(--gray);
+  }
+}
+
 .search
   > .search-container
   > .search-space

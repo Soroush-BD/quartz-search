@@ -54,6 +54,12 @@ interface SearchOptions {
   placeholder?: string;
   /** Custom title for the search button */
   title?: string;
+  /** How many results to list, headings first, then pages (default 8) */
+  resultLimit?: number;
+  /** Note where each result is, under it (default false) */
+  showPath?: boolean;
+  /** The folder those paths start from, standing for the content folder */
+  pathRoot?: string;
 }
 ```
 
@@ -64,6 +70,7 @@ By default, the search component:
 - Displays as a button with a search icon
 - Opens a fullscreen search modal when clicked
 - Shows up to 8 search results
+- Lists matching headings as results of their own, linking straight to them, when the ContentIndex emitter's `includeHeadings` option is on
 - Enables content preview on desktop (can be disabled)
 - Supports keyboard navigation (arrow keys, Enter, Escape)
 - Uses FlexSearch from CDN for indexing
