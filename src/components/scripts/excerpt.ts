@@ -2,12 +2,8 @@ import { escapeHTML } from "@quartz-community/utils";
 
 /** How many of a page's matching lines a result shows. */
 const excerptLineLimit = 3;
-/**
- * Characters of a long line kept before its first match and after its last,
- * as Obsidian's search keeps them.
- */
-const excerptContextBefore = 49;
-const excerptContextAfter = 50;
+/** Characters of a long line kept before its first match and after its last. */
+const excerptContext = 50;
 
 /** The search term's words, then each run of them from the first, longest first. */
 export function tokenizeTerm(term: string): string[] {
@@ -59,17 +55,20 @@ function isInsideWord(line: string, index: number): boolean {
 
 /**
  * A long line cut to its matches, which run from `start` to `end`, keeping
- * about `excerptContextBefore` and `excerptContextAfter` characters either
- * side, with ellipses where text is left out. Each cut moves to the nearest
- * edge of a word inside that context, so no word is split; punctuation counts
- * as an edge, as in a path. The text before the closing ellipsis ends on a
- * word, not on a space or punctuation.
+ * about `excerptContext` characters either side, with ellipses where text is
+ * left out. Each cut moves to the nearest edge of a word inside that context,
+ * so no word is split; punctuation counts as an edge, as in a path. The text
+ * between the ellipses starts and ends on a word, not on a space or
+ * punctuation.
  */
 function shortenLine(line: string, start: number, end: number): string {
-  let from = Math.max(0, start - excerptContextBefore);
-  let to = Math.min(line.length, end + excerptContextAfter);
+  let from = Math.max(0, start - excerptContext);
+  let to = Math.min(line.length, end + excerptContext);
 
   while (from < start && isInsideWord(line, from)) from++;
+  if (from > 0) {
+    while (from < start && !wordCharacter.test(line[from] ?? "")) from++;
+  }
   while (to > end && isInsideWord(line, to)) to--;
   if (to < line.length) {
     while (to > end && !wordCharacter.test(line[to - 1] ?? "")) to--;
